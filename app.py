@@ -15,7 +15,8 @@ client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 MODELOS_DISPONIVEIS = [
     'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-1.5-flash'
+    'gemini-1.5-flash',
+    'gemini-3.8-flash'
 ]
 
 def gerar_resposta_com_fallback(prompt):
