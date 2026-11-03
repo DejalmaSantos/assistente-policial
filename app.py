@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 from google import genai
 
@@ -11,34 +12,42 @@ st.markdown("Automatize a redação de declarações e prepare-se estrategicamen
 # Inicializa o cliente do Gemini puxando a chave secreta configurada no Streamlit
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Lista de modelos em ordem de preferência (do mais recente ao mais estável)
+# Lista de modelos válidos vigentes em ordem de preferência
 MODELOS_DISPONIVEIS = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-3.8-flash'
+    'gemini-3.8-flash',
+    'gemini-3-flash',
+    'gemini-2.5-flash'
 ]
 
 def gerar_resposta_com_fallback(prompt):
     """
-    Tenta gerar conteúdo testando a lista de modelos automaticamente.
-    Retorna o texto gerado assim que um dos modelos responder com sucesso.
+    Tenta gerar conteúdo testando a lista de modelos válidos.
+    Caso encontre instabilidade de servidor (503), faz uma breve pausa e tenta novamente.
     """
     erros = []
-    for modelo in MODELOS_DISPONIVEIS:
-        try:
-            response = client.models.generate_content(
-                model=modelo,
-                contents=prompt,
-            )
-            return response.text
-        except Exception as e:
-            # Se der erro no modelo atual, guarda a mensagem e tenta o próximo da lista
-            erros.append(f"{modelo}: {e}")
-            continue
     
-    # Se todos falharem, lança uma exceção informando os erros
-    raise Exception("Nenhum modelo disponível no momento. Erros: " + " | ".join(erros))
+    for modelo in MODELOS_DISPONIVEIS:
+        # Tenta até 2 vezes cada modelo caso haja pico temporário de demanda (503)
+        for tentativa in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=modelo,
+                    contents=prompt,
+                )
+                return response.text
+            except Exception as e:
+                erro_msg = str(e)
+                erros.append(f"{modelo} (tentativa {tentativa+1}): {erro_msg}")
+                
+                # Se for erro de indisponibilidade temporária (503), espera 2 segundos antes de tentar de novo
+                if "503" in erro_msg or "UNAVAILABLE" in erro_msg:
+                    time.sleep(2)
+                    continue
+                else:
+                    # Se for outro erro (ex: 404), vai direto para o próximo modelo da lista
+                    break
+    
+    raise Exception("Servidores indisponíveis no momento. Detalhes: " + " | ".join(erros))
 
 
 # Abas na tela para separar as duas funções
@@ -55,7 +64,7 @@ with aba1:
         if texto_bo.strip() == "":
             st.warning("Por favor, insira o texto do Boletim de Ocorrência.")
         else:
-            with st.spinner("Procurando o melhor modelo Gemini disponível e processando..."):
+            with st.spinner("Conectando ao Gemini e processando a declaração..."):
                 try:
                     prompt = f"""
                     Atue como um escrivão de polícia experiente. 
@@ -67,7 +76,6 @@ with aba1:
                     {texto_bo}
                     """
                     
-                    # Chamada automática com fallback
                     resultado = gerar_resposta_com_fallback(prompt)
                     
                     st.success("Declaração gerada com sucesso!")
@@ -86,7 +94,7 @@ with aba2:
         if texto_proc.strip() == "":
             st.warning("Por favor, insira o texto do procedimento.")
         else:
-            with st.spinner("Procurando o melhor modelo Gemini disponível e analisando..."):
+            with st.spinner("Conectando ao Gemini e analisando o caso..."):
                 try:
                     prompt = f"""
                     Atue como um Delegado de Polícia experiente. 
@@ -98,7 +106,6 @@ with aba2:
                     {texto_proc}
                     """
                     
-                    # Chamada automática com fallback
                     resultado = gerar_resposta_com_fallback(prompt)
                     
                     st.success("Análise concluída!")
