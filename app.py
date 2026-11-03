@@ -11,6 +11,35 @@ st.markdown("Automatize a redação de declarações e prepare-se estrategicamen
 # Inicializa o cliente do Gemini puxando a chave secreta configurada no Streamlit
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
+# Lista de modelos em ordem de preferência (do mais recente ao mais estável)
+MODELOS_DISPONIVEIS = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
+]
+
+def gerar_resposta_com_fallback(prompt):
+    """
+    Tenta gerar conteúdo testando a lista de modelos automaticamente.
+    Retorna o texto gerado assim que um dos modelos responder com sucesso.
+    """
+    erros = []
+    for modelo in MODELOS_DISPONIVEIS:
+        try:
+            response = client.models.generate_content(
+                model=modelo,
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            # Se der erro no modelo atual, guarda a mensagem e tenta o próximo da lista
+            erros.append(f"{modelo}: {e}")
+            continue
+    
+    # Se todos falharem, lança uma exceção informando os erros
+    raise Exception("Nenhum modelo disponível no momento. Erros: " + " | ".join(erros))
+
+
 # Abas na tela para separar as duas funções
 aba1, aba2 = st.tabs(["📄 Gerar Declaração (B.O.)", "🎯 Análise e Interrogatório"])
 
@@ -25,7 +54,7 @@ with aba1:
         if texto_bo.strip() == "":
             st.warning("Por favor, insira o texto do Boletim de Ocorrência.")
         else:
-            with st.spinner("O Gemini está redigindo a declaração..."):
+            with st.spinner("Procurando o melhor modelo Gemini disponível e processando..."):
                 try:
                     prompt = f"""
                     Atue como um escrivão de polícia experiente. 
@@ -37,14 +66,11 @@ with aba1:
                     {texto_bo}
                     """
                     
-                    # Usando o modelo mais recente e correto
-                    response = client.models.generate_content(
-                        model='gemini-3.8-flash',
-                        contents=prompt,
-                    )
+                    # Chamada automática com fallback
+                    resultado = gerar_resposta_com_fallback(prompt)
                     
                     st.success("Declaração gerada com sucesso!")
-                    st.text_area("Resultado:", value=response.text, height=200)
+                    st.text_area("Resultado:", value=resultado, height=200)
                 except Exception as e:
                     st.error(f"Erro ao processar: {e}")
 
@@ -59,7 +85,7 @@ with aba2:
         if texto_proc.strip() == "":
             st.warning("Por favor, insira o texto do procedimento.")
         else:
-            with st.spinner("Analisando o caso e cruzando dados..."):
+            with st.spinner("Procurando o melhor modelo Gemini disponível e analisando..."):
                 try:
                     prompt = f"""
                     Atue como um Delegado de Polícia experiente. 
@@ -71,12 +97,10 @@ with aba2:
                     {texto_proc}
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-3.8-flash',
-                        contents=prompt,
-                    )
+                    # Chamada automática com fallback
+                    resultado = gerar_resposta_com_fallback(prompt)
                     
                     st.success("Análise concluída!")
-                    st.text_area("Pontos-Chave e Perguntas:", value=response.text, height=300)
+                    st.text_area("Pontos-Chave e Perguntas:", value=resultado, height=300)
                 except Exception as e:
                     st.error(f"Erro ao processar: {e}")
