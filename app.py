@@ -8,11 +8,10 @@ st.set_page_config(page_title="Assistente de Polícia Civil - IA", page_icon="�
 st.title("👮‍♂️ Assistente Inteligente para Polícia Civil")
 st.markdown("Automatize a redação de declarações e prepare-se estrategicamente para interrogatórios.")
 
-# Inicializa o cliente do Gemini
-# (Certifique-se de ter configurado sua variável de ambiente GEMINI_API_KEY)
-client = genai.Client()
+# Inicializa o cliente do Gemini puxando a chave secreta configurada no Streamlit
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Abas na tela para separar as duas funções que você faz
+# Abas na tela para separar as duas funções
 aba1, aba2 = st.tabs(["📄 Gerar Declaração (B.O.)", "🎯 Análise e Interrogatório"])
 
 # --- ABA 1: GERADOR DE DECLARAÇÃO ---
@@ -38,8 +37,9 @@ with aba1:
                     {texto_bo}
                     """
                     
+                    # Usando o modelo oficial padrão
                     response = client.models.generate_content(
-                        model='gemini-3',
+                        model='gemini-2.5-flash',
                         contents=prompt,
                     )
                     
@@ -72,7 +72,7 @@ with aba2:
                     """
                     
                     response = client.models.generate_content(
-                        model='gemini-3',
+                        model='gemini-2.5-flash',
                         contents=prompt,
                     )
                     
