@@ -12,43 +12,33 @@ st.markdown("Automatize a redação de declarações e prepare-se estrategicamen
 # Inicializa o cliente do Gemini puxando a chave secreta configurada no Streamlit
 client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Lista de modelos válidos vigentes em ordem de preferência
-MODELOS_DISPONIVEIS = [
-    'gemini-3.8-flash',
-    'gemini-3-flash',
-    'gemini-2.5-flash'
-]
-
-def gerar_resposta_com_fallback(prompt):
+def gerar_resposta_estavel(prompt):
     """
-    Tenta gerar conteúdo testando a lista de modelos válidos.
-    Caso encontre instabilidade de servidor (503), faz uma breve pausa e tenta novamente.
+    Usa o alias 'gemini-flash-latest' com tentativas automáticas 
+    caso ocorra instabilidade temporária (503).
     """
     erros = []
-    
-    for modelo in MODELOS_DISPONIVEIS:
-        # Tenta até 2 vezes cada modelo caso haja pico temporário de demanda (503)
-        for tentativa in range(2):
-            try:
-                response = client.models.generate_content(
-                    model=modelo,
-                    contents=prompt,
-                )
-                return response.text
-            except Exception as e:
-                erro_msg = str(e)
-                erros.append(f"{modelo} (tentativa {tentativa+1}): {erro_msg}")
+    # Tenta até 3 vezes com pequenas pausas caso o servidor esteja congestionado
+    for tentativa in range(3):
+        try:
+            response = client.models.generate_content(
+                model='gemini-flash-latest',
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            erro_msg = str(e)
+            erros.append(f"Tentativa {tentativa+1}: {erro_msg}")
+            
+            # Se for instabilidade temporária (503), espera 3 segundos e tenta de novo
+            if "503" in erro_msg or "UNAVAILABLE" in erro_msg:
+                time.sleep(3)
+                continue
+            else:
+                # Para qualquer outro erro, para e levanta o erro
+                break
                 
-                # Se for erro de indisponibilidade temporária (503), espera 2 segundos antes de tentar de novo
-                if "503" in erro_msg or "UNAVAILABLE" in erro_msg:
-                    time.sleep(2)
-                    continue
-                else:
-                    # Se for outro erro (ex: 404), vai direto para o próximo modelo da lista
-                    break
-    
-    raise Exception("Servidores indisponíveis no momento. Detalhes: " + " | ".join(erros))
-
+    raise Exception("Não foi possível obter resposta no momento. Detalhes: " + " | ".join(erros))
 
 # Abas na tela para separar as duas funções
 aba1, aba2 = st.tabs(["📄 Gerar Declaração (B.O.)", "🎯 Análise e Interrogatório"])
@@ -64,7 +54,7 @@ with aba1:
         if texto_bo.strip() == "":
             st.warning("Por favor, insira o texto do Boletim de Ocorrência.")
         else:
-            with st.spinner("Conectando ao Gemini e processando a declaração..."):
+            with st.spinner("Processando com Gemini..."):
                 try:
                     prompt = f"""
                     Atue como um escrivão de polícia experiente. 
@@ -76,7 +66,7 @@ with aba1:
                     {texto_bo}
                     """
                     
-                    resultado = gerar_resposta_com_fallback(prompt)
+                    resultado = gerar_resposta_estavel(prompt)
                     
                     st.success("Declaração gerada com sucesso!")
                     st.text_area("Resultado:", value=resultado, height=200)
@@ -94,7 +84,7 @@ with aba2:
         if texto_proc.strip() == "":
             st.warning("Por favor, insira o texto do procedimento.")
         else:
-            with st.spinner("Conectando ao Gemini e analisando o caso..."):
+            with st.spinner("Analisando o caso..."):
                 try:
                     prompt = f"""
                     Atue como um Delegado de Polícia experiente. 
@@ -106,7 +96,7 @@ with aba2:
                     {texto_proc}
                     """
                     
-                    resultado = gerar_resposta_com_fallback(prompt)
+                    resultado = gerar_resposta_estavel(prompt)
                     
                     st.success("Análise concluída!")
                     st.text_area("Pontos-Chave e Perguntas:", value=resultado, height=300)
