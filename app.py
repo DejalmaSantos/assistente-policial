@@ -61,7 +61,7 @@ with aba1:
                     """
                     
                     response = client.models.generate_content(
-                        model='gemini-3.8-flash',
+                        model='gemini-flash-latest',
                         contents=prompt,
                     )
                     
@@ -113,7 +113,7 @@ with aba2:
                     """
                     
                     response = client.models.generate_content(
-                        model='gemini-3.8-flash',
+                        model='gemini-flash-latest',
                         contents=prompt,
                     )
                     
